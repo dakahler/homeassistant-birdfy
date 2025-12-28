@@ -1,0 +1,12 @@
+{
+  "domain": "birdfy_highlights",
+  "name": "Birdfy Highlights",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/dakahler/homeassistant-birdfy",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/dakahler/homeassistant-birdfy/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Birdfy Highlights",
+        "description": "Enter your Birdfy Highlights UUID. You can find this from a highlight share link like: https://highlight.birdfy.com/?uuid=YOUR_UUID",
+        "data": {
+          "uuid": "Highlight UUID"
+        }
+      }
+    },
+    "error": {
+      "invalid_uuid": "Invalid UUID. Please check the UUID and try again.",
+      "unknown": "Unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This UUID is already configured."
+    }
+  }
+}
