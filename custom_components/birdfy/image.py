@@ -117,25 +117,44 @@ class BirdfyLastBirdImage(CoordinatorEntity, ImageEntity):
             _LOGGER.debug("No coordinator data available")
             return None
 
-        highlights = self.coordinator.data.get("highlights", [])
-        if not highlights:
-            _LOGGER.debug("No highlights in data")
-            return None
-
-        # Get the most recent highlight
-        last_highlight = highlights[0]
-        species = last_highlight.get("species")
-        _LOGGER.debug("Last highlight species: %s", species)
-
-        if not species:
-            _LOGGER.debug("No species in last highlight")
-            return None
-
-        # Get thumbnail URL from thumbnails dict
         thumbnails = self.coordinator.data.get("thumbnails", {})
-        url = thumbnails.get(species)
-        _LOGGER.debug("Thumbnail URL for %s: %s", species, url)
-        return url
+        _LOGGER.debug("Available thumbnails: %s", list(thumbnails.keys()))
+
+        if not thumbnails:
+            _LOGGER.debug("No thumbnails available")
+            return None
+
+        highlights = self.coordinator.data.get("highlights", [])
+
+        # Try to get thumbnail for the most recent highlight species
+        if highlights:
+            last_highlight = highlights[0]
+            species = last_highlight.get("species")
+            _LOGGER.debug("Last highlight species: %s", species)
+
+            if species and species in thumbnails:
+                url = thumbnails[species]
+                _LOGGER.debug("Thumbnail URL for %s: %s", species, url)
+                return url
+            else:
+                _LOGGER.debug("Species '%s' not in thumbnails, checking highlights for match", species)
+
+            # Try to find a highlight species that has a thumbnail
+            for highlight in highlights:
+                h_species = highlight.get("species")
+                if h_species and h_species in thumbnails:
+                    url = thumbnails[h_species]
+                    _LOGGER.debug("Found thumbnail for highlight species %s: %s", h_species, url)
+                    return url
+
+        # Fallback: use first available thumbnail
+        if thumbnails:
+            first_species = next(iter(thumbnails))
+            url = thumbnails[first_species]
+            _LOGGER.debug("Fallback to first thumbnail (%s): %s", first_species, url)
+            return url
+
+        return None
 
     async def async_image(self) -> bytes | None:
         """Return bytes of image."""
