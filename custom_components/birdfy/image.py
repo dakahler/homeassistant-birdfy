@@ -58,6 +58,7 @@ class BirdfyLastBirdImage(CoordinatorEntity, ImageEntity):
     """Image entity showing the last bird seen."""
 
     _attr_has_entity_name = True
+    _attr_content_type = "image/jpeg"
 
     def __init__(
         self,
@@ -75,6 +76,7 @@ class BirdfyLastBirdImage(CoordinatorEntity, ImageEntity):
         self._subentry_name = subentry_name
         self._current_url: str | None = None
         self._cached_image: bytes | None = None
+        self._attr_image_last_updated = datetime.now()
 
         # Set name based on subentry
         if subentry_name:
@@ -123,22 +125,6 @@ class BirdfyLastBirdImage(CoordinatorEntity, ImageEntity):
         thumbnails = self.coordinator.data.get("thumbnails", {})
         return thumbnails.get(species)
 
-    @property
-    def image_last_updated(self) -> datetime | None:
-        """Return the timestamp of when the image was last updated."""
-        if self.coordinator.data is None:
-            return None
-
-        highlights = self.coordinator.data.get("highlights", [])
-        if not highlights:
-            return None
-
-        last_time = highlights[0].get("time")
-        if last_time:
-            return datetime.fromtimestamp(last_time / 1000)
-
-        return None
-
     async def async_image(self) -> bytes | None:
         """Return bytes of image."""
         url = self._get_image_url()
@@ -171,6 +157,8 @@ class BirdfyLastBirdImage(CoordinatorEntity, ImageEntity):
         if new_url != self._current_url:
             # Clear cache so new image will be fetched
             self._cached_image = None
+            # Update timestamp to trigger image refresh
+            self._attr_image_last_updated = datetime.now()
 
         super()._handle_coordinator_update()
 
