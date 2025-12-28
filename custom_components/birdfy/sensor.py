@@ -1,4 +1,4 @@
-"""Sensor platform for Birdfy Highlights."""
+"""Sensor platform for Birdfy."""
 
 from __future__ import annotations
 
@@ -23,6 +23,9 @@ from .const import (
     ATTR_NEW_SPECIES,
     ATTR_LAST_DETECTION,
     ATTR_THUMBNAILS,
+    ATTR_DATE_RANGE,
+    ATTR_START_TIME,
+    ATTR_END_TIME,
 )
 from .coordinator import BirdfyHighlightsCoordinator
 
@@ -54,23 +57,71 @@ async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
+    subentry_id: str | None = None,
 ) -> None:
-    """Set up Birdfy Highlights sensors."""
-    coordinator: BirdfyHighlightsCoordinator = hass.data[DOMAIN][entry.entry_id]
+    """Set up Birdfy sensors."""
+    coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"]
 
     entities = []
 
-    for description in SENSOR_DESCRIPTIONS:
-        entities.append(BirdfyHighlightsSensor(coordinator, entry, description))
-
-    # Add the species list sensor
-    entities.append(BirdfySpeciesListSensor(coordinator, entry))
+    if subentry_id:
+        # Set up sensors for a specific subentry
+        coordinator = coordinators.get(subentry_id)
+        if coordinator:
+            subentry = entry.subentries.get(subentry_id)
+            subentry_name = subentry.title if subentry else "Unknown"
+            entities.extend(
+                _create_sensors_for_coordinator(
+                    coordinator, entry, subentry_id, subentry_name
+                )
+            )
+    else:
+        # Initial setup - create sensors for all coordinators
+        for coord_id, coordinator in coordinators.items():
+            if coord_id == "default":
+                # Default coordinator (no subentries)
+                entities.extend(
+                    _create_sensors_for_coordinator(coordinator, entry, None, None)
+                )
+            else:
+                # Subentry coordinator
+                subentry = entry.subentries.get(coord_id)
+                subentry_name = subentry.title if subentry else "Unknown"
+                entities.extend(
+                    _create_sensors_for_coordinator(
+                        coordinator, entry, coord_id, subentry_name
+                    )
+                )
 
     async_add_entities(entities)
 
 
+def _create_sensors_for_coordinator(
+    coordinator: BirdfyHighlightsCoordinator,
+    entry: ConfigEntry,
+    subentry_id: str | None,
+    subentry_name: str | None,
+) -> list[SensorEntity]:
+    """Create sensor entities for a coordinator."""
+    entities = []
+
+    for description in SENSOR_DESCRIPTIONS:
+        entities.append(
+            BirdfyHighlightsSensor(
+                coordinator, entry, description, subentry_id, subentry_name
+            )
+        )
+
+    # Add the species list sensor
+    entities.append(
+        BirdfySpeciesListSensor(coordinator, entry, subentry_id, subentry_name)
+    )
+
+    return entities
+
+
 class BirdfyHighlightsSensor(CoordinatorEntity, SensorEntity):
-    """Representation of a Birdfy Highlights sensor."""
+    """Representation of a Birdfy sensor."""
 
     _attr_has_entity_name = True
 
@@ -79,14 +130,32 @@ class BirdfyHighlightsSensor(CoordinatorEntity, SensorEntity):
         coordinator: BirdfyHighlightsCoordinator,
         entry: ConfigEntry,
         description: SensorEntityDescription,
+        subentry_id: str | None = None,
+        subentry_name: str | None = None,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        self._subentry_id = subentry_id
+        self._subentry_name = subentry_name
+
+        # Create unique ID based on subentry
+        if subentry_id:
+            self._attr_unique_id = f"{entry.entry_id}_{subentry_id}_{description.key}"
+        else:
+            self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+
+        # Create device info - each subentry gets its own device
+        if subentry_id and subentry_name:
+            device_id = f"{entry.entry_id}_{subentry_id}"
+            device_name = f"Birdfy - {subentry_name}"
+        else:
+            device_id = entry.entry_id
+            device_name = "Birdfy"
+
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": "Birdfy Highlights",
+            "identifiers": {(DOMAIN, device_id)},
+            "name": device_name,
             "manufacturer": "Birdfy",
             "model": "Highlights API",
         }
@@ -146,20 +215,43 @@ class BirdfySpeciesListSensor(CoordinatorEntity, SensorEntity):
     """Sensor that exposes the full species list and highlights."""
 
     _attr_has_entity_name = True
-    _attr_name = "Bird Species Today"
     _attr_icon = "mdi:format-list-bulleted"
 
     def __init__(
         self,
         coordinator: BirdfyHighlightsCoordinator,
         entry: ConfigEntry,
+        subentry_id: str | None = None,
+        subentry_name: str | None = None,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
-        self._attr_unique_id = f"{entry.entry_id}_species_today"
+        self._subentry_id = subentry_id
+        self._subentry_name = subentry_name
+
+        # Set name based on subentry
+        if subentry_name:
+            self._attr_name = f"Bird Species - {subentry_name}"
+        else:
+            self._attr_name = "Bird Species"
+
+        # Create unique ID based on subentry
+        if subentry_id:
+            self._attr_unique_id = f"{entry.entry_id}_{subentry_id}_species_list"
+        else:
+            self._attr_unique_id = f"{entry.entry_id}_species_list"
+
+        # Create device info - each subentry gets its own device
+        if subentry_id and subentry_name:
+            device_id = f"{entry.entry_id}_{subentry_id}"
+            device_name = f"Birdfy - {subentry_name}"
+        else:
+            device_id = entry.entry_id
+            device_name = "Birdfy"
+
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": "Birdfy Highlights",
+            "identifiers": {(DOMAIN, device_id)},
+            "name": device_name,
             "manufacturer": "Birdfy",
             "model": "Highlights API",
         }
@@ -187,7 +279,21 @@ class BirdfySpeciesListSensor(CoordinatorEntity, SensorEntity):
             ATTR_NEW_SPECIES: data.get("new_species", []),
             ATTR_THUMBNAILS: data.get("thumbnails", {}),
             ATTR_HIGHLIGHTS: data.get("highlights", []),
+            ATTR_DATE_RANGE: data.get("date_range"),
         }
+
+        # Add timestamps if available
+        start_time = data.get("start_time")
+        if start_time:
+            attrs[ATTR_START_TIME] = datetime.fromtimestamp(
+                start_time / 1000
+            ).isoformat()
+
+        end_time = data.get("end_time")
+        if end_time:
+            attrs[ATTR_END_TIME] = datetime.fromtimestamp(
+                end_time / 1000
+            ).isoformat()
 
         last_detection = data.get("last_detection")
         if last_detection:

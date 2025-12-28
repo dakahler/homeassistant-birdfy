@@ -1,0 +1,60 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Birdfy",
+        "description": "Enter your Birdfy UUID. You can find this from a highlight share link like: https://highlight.birdfy.com/?uuid=YOUR_UUID",
+        "data": {
+          "uuid": "Highlight UUID"
+        }
+      }
+    },
+    "error": {
+      "invalid_uuid": "Invalid UUID. Please check the UUID and try again.",
+      "unknown": "Unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This UUID is already configured."
+    }
+  },
+  "config_subentries": {
+    "date_range": {
+      "step": {
+        "user": {
+          "title": "Add Date Range Configuration",
+          "description": "Create a new sensor group with a specific date range.",
+          "data": {
+            "name": "Name (optional)",
+            "date_range": "Date Range"
+          },
+          "data_description": {
+            "name": "A friendly name for this date range configuration. Leave empty to use the date range as the name.",
+            "date_range": "The time period to fetch bird species data for."
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure Date Range",
+          "description": "Update this date range configuration.",
+          "data": {
+            "name": "Name",
+            "date_range": "Date Range"
+          }
+        }
+      }
+    }
+  },
+  "selector": {
+    "date_range": {
+      "options": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "last_7_days": "Last 7 Days",
+        "last_14_days": "Last 14 Days",
+        "last_30_days": "Last 30 Days",
+        "this_week": "This Week",
+        "this_month": "This Month",
+        "all_time": "All Time"
+      }
+    }
+  }
+}
