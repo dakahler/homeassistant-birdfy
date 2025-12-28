@@ -4,12 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import aiohttp
-
 from homeassistant.components.image import ImageEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -58,7 +55,6 @@ class BirdfyLastBirdImage(CoordinatorEntity, ImageEntity):
     """Image entity showing the last bird seen."""
 
     _attr_has_entity_name = True
-    _attr_content_type = "image/jpeg"
 
     def __init__(
         self,
@@ -74,9 +70,7 @@ class BirdfyLastBirdImage(CoordinatorEntity, ImageEntity):
 
         self._subentry_id = subentry_id
         self._subentry_name = subentry_name
-        self._current_url: str | None = None
-        self._cached_image: bytes | None = None
-        self._attr_image_last_updated = datetime.now()
+        self._last_url: str | None = None
 
         # Set name based on subentry
         if subentry_name:
@@ -125,39 +119,18 @@ class BirdfyLastBirdImage(CoordinatorEntity, ImageEntity):
         thumbnails = self.coordinator.data.get("thumbnails", {})
         return thumbnails.get(species)
 
-    async def async_image(self) -> bytes | None:
-        """Return bytes of image."""
-        url = self._get_image_url()
-
-        if url is None:
-            return None
-
-        # Return cached image if URL hasn't changed
-        if url == self._current_url and self._cached_image is not None:
-            return self._cached_image
-
-        # Fetch new image
-        try:
-            session = async_get_clientsession(self.hass)
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status == 200:
-                    self._cached_image = await response.read()
-                    self._current_url = url
-                    return self._cached_image
-        except Exception:
-            pass
-
-        return self._cached_image
+    @property
+    def image_url(self) -> str | None:
+        """Return URL of image."""
+        return self._get_image_url()
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        # Check if image URL changed
+        # Check if image URL changed to update the timestamp
         new_url = self._get_image_url()
-        if new_url != self._current_url:
-            # Clear cache so new image will be fetched
-            self._cached_image = None
-            # Update timestamp to trigger image refresh
+        if new_url != self._last_url:
+            self._last_url = new_url
             self._attr_image_last_updated = datetime.now()
 
         super()._handle_coordinator_update()
@@ -177,7 +150,6 @@ class BirdfyLastBirdImage(CoordinatorEntity, ImageEntity):
             "species": last.get("species"),
             "title": last.get("title"),
             "category": last.get("category"),
-            "image_url": self._get_image_url(),
         }
 
         if last.get("time"):
