@@ -1,6 +1,6 @@
 {
-  "domain": "birdfy_highlights",
-  "name": "Birdfy Highlights",
+  "domain": "birdfy",
+  "name": "Birdfy",
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],
