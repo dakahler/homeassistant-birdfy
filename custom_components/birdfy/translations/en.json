@@ -19,6 +19,10 @@
   },
   "config_subentries": {
     "date_range": {
+      "entry_type": "Date Range",
+      "initiate_flow": {
+        "user": "Add date range"
+      },
       "step": {
         "user": {
           "title": "Add Date Range Configuration",
