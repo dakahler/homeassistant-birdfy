@@ -13,10 +13,11 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import BirdfyHighlightsApi
+from .api import BirdfyHighlightsApi, BirdfyRecapApi
 from .const import (
     DOMAIN,
     CONF_UUID,
+    CONF_RECAP_UUID,
     CONF_DATE_RANGE,
     CONF_SUBENTRY_NAME,
     DEFAULT_DATE_RANGE,
@@ -29,6 +30,7 @@ _LOGGER = logging.getLogger(__name__)
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_UUID): str,
+        vol.Optional(CONF_RECAP_UUID, default=""): str,
     }
 )
 
@@ -36,10 +38,18 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
     session = async_get_clientsession(hass)
-    api = BirdfyHighlightsApi(data[CONF_UUID], session)
 
+    # Validate highlights UUID (required)
+    api = BirdfyHighlightsApi(data[CONF_UUID], session)
     if not await api.async_validate_uuid():
         raise InvalidUUID
+
+    # Validate recap UUID if provided (optional)
+    recap_uuid = data.get(CONF_RECAP_UUID, "").strip()
+    if recap_uuid:
+        recap_api = BirdfyRecapApi(recap_uuid, session)
+        if not await recap_api.async_validate_uuid():
+            raise InvalidRecapUUID
 
     # Return info to store in the config entry
     return {"title": f"Birdfy ({data[CONF_UUID][:8]}...)"}
@@ -61,6 +71,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 info = await validate_input(self.hass, user_input)
             except InvalidUUID:
                 errors["base"] = "invalid_uuid"
+            except InvalidRecapUUID:
+                errors["base"] = "invalid_recap_uuid"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
@@ -68,6 +80,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Check if already configured
                 await self.async_set_unique_id(user_input[CONF_UUID])
                 self._abort_if_unique_id_configured()
+
+                # Clean up empty recap UUID
+                if not user_input.get(CONF_RECAP_UUID, "").strip():
+                    user_input.pop(CONF_RECAP_UUID, None)
 
                 return self.async_create_entry(title=info["title"], data=user_input)
 
@@ -77,6 +93,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: ConfigEntry,
+    ) -> OptionsFlowHandler:
+        """Get the options flow for this handler."""
+        return OptionsFlowHandler()
+
     @classmethod
     @callback
     def async_get_supported_subentry_types(
@@ -84,6 +108,51 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> dict[str, type[ConfigSubentryFlow]]:
         """Return subentries supported by this integration."""
         return {SUBENTRY_TYPE_DATE_RANGE: DateRangeSubentryFlowHandler}
+
+
+class OptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle options flow to update UUIDs."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the options."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            session = async_get_clientsession(self.hass)
+
+            # Validate recap UUID if provided
+            recap_uuid = user_input.get(CONF_RECAP_UUID, "").strip()
+            if recap_uuid:
+                recap_api = BirdfyRecapApi(recap_uuid, session)
+                if not await recap_api.async_validate_uuid():
+                    errors["base"] = "invalid_recap_uuid"
+
+            if not errors:
+                # Update the config entry data
+                new_data = dict(self.config_entry.data)
+                if recap_uuid:
+                    new_data[CONF_RECAP_UUID] = recap_uuid
+                else:
+                    new_data.pop(CONF_RECAP_UUID, None)
+
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, data=new_data
+                )
+                return self.async_create_entry(title="", data={})
+
+        current_recap_uuid = self.config_entry.data.get(CONF_RECAP_UUID, "")
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_RECAP_UUID, default=current_recap_uuid): str,
+                }
+            ),
+            errors=errors,
+        )
 
 
 class DateRangeSubentryFlowHandler(ConfigSubentryFlow):
@@ -163,4 +232,8 @@ class DateRangeSubentryFlowHandler(ConfigSubentryFlow):
 
 
 class InvalidUUID(Exception):
-    """Error to indicate the UUID is invalid."""
+    """Error to indicate the highlights UUID is invalid."""
+
+
+class InvalidRecapUUID(Exception):
+    """Error to indicate the recap UUID is invalid."""

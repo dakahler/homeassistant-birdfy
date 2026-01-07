@@ -9,9 +9,9 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import BirdfyHighlightsApi
-from .const import DOMAIN, CONF_UUID, CONF_DATE_RANGE, DEFAULT_DATE_RANGE
-from .coordinator import BirdfyHighlightsCoordinator
+from .api import BirdfyHighlightsApi, BirdfyRecapApi
+from .const import DOMAIN, CONF_UUID, CONF_RECAP_UUID, CONF_DATE_RANGE, DEFAULT_DATE_RANGE
+from .coordinator import BirdfyHighlightsCoordinator, BirdfyRecapCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.IMAGE]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Birdfy from a config entry."""
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {"coordinators": {}}
+    hass.data[DOMAIN][entry.entry_id] = {"coordinators": {}, "recap_coordinator": None}
 
     session = async_get_clientsession(hass)
     api = BirdfyHighlightsApi(entry.data[CONF_UUID], session)
@@ -37,6 +37,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         await coordinator.async_config_entry_first_refresh()
         hass.data[DOMAIN][entry.entry_id]["coordinators"]["default"] = coordinator
+
+    # Set up recap coordinator if recap UUID is provided
+    recap_uuid = entry.data.get(CONF_RECAP_UUID)
+    if recap_uuid:
+        recap_api = BirdfyRecapApi(recap_uuid, session)
+        recap_coordinator = BirdfyRecapCoordinator(hass, recap_api, entry)
+        await recap_coordinator.async_config_entry_first_refresh()
+        hass.data[DOMAIN][entry.entry_id]["recap_coordinator"] = recap_coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

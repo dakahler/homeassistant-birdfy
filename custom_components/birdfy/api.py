@@ -7,6 +7,7 @@ import logging
 
 from .const import (
     API_URL,
+    RECAP_API_URL,
     DATE_RANGE_TODAY,
     DATE_RANGE_YESTERDAY,
     DATE_RANGE_LAST_7_DAYS,
@@ -76,8 +77,12 @@ class BirdfyHighlightsApiError(Exception):
     """Exception for API errors."""
 
 
+class BirdfyRecapApiError(Exception):
+    """Exception for Recap API errors."""
+
+
 class BirdfyHighlightsApi:
-    """API client for Birdfy."""
+    """API client for Birdfy Highlights."""
 
     def __init__(self, uuid: str, session: aiohttp.ClientSession) -> None:
         """Initialize the API client."""
@@ -130,4 +135,61 @@ class BirdfyHighlightsApi:
             # If we get data back (even empty), the UUID is valid
             return "birdList" in data or "dataList" in data or data.get("dateRange")
         except BirdfyHighlightsApiError:
+            return False
+
+
+class BirdfyRecapApi:
+    """API client for Birdfy Monthly Recap."""
+
+    def __init__(self, uuid: str, session: aiohttp.ClientSession) -> None:
+        """Initialize the API client."""
+        self._uuid = uuid
+        self._session = session
+
+    async def async_get_recap(self, need_history: bool = True) -> dict:
+        """Fetch recap data from the API."""
+        params = {"uuid": self._uuid}
+        if need_history:
+            params["needHistory"] = "1"
+
+        _LOGGER.debug("Fetching recap with params: %s", params)
+
+        try:
+            async with self._session.get(
+                RECAP_API_URL, params=params, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+                # Handle 204 No Content
+                if response.status == 204:
+                    raise BirdfyRecapApiError("No recap data available (may have expired)")
+
+                response.raise_for_status()
+
+                # Check for empty response
+                content_length = response.headers.get("content-length")
+                if content_length == "0":
+                    raise BirdfyRecapApiError("No recap data available (empty response)")
+
+                data = await response.json()
+
+                if data.get("message"):
+                    raise BirdfyRecapApiError(data["message"])
+
+                return data
+
+        except aiohttp.ClientError as err:
+            raise BirdfyRecapApiError(f"Error communicating with Recap API: {err}")
+        except asyncio.TimeoutError:
+            raise BirdfyRecapApiError("Timeout communicating with Recap API")
+
+    async def async_validate_uuid(self) -> bool:
+        """Validate that the recap UUID is valid by making a test request."""
+        try:
+            data = await self.async_get_recap()
+            # If we get data with statistics fields, the UUID is valid
+            return (
+                "statisticsDate" in data
+                or "birdSpeciesCount" in data
+                or "eventCount" in data
+            )
+        except BirdfyRecapApiError:
             return False

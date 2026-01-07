@@ -7,14 +7,20 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import BirdfyHighlightsApi, BirdfyHighlightsApiError, get_date_range_timestamps
-from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, DEFAULT_DATE_RANGE
+from .api import (
+    BirdfyHighlightsApi,
+    BirdfyHighlightsApiError,
+    BirdfyRecapApi,
+    BirdfyRecapApiError,
+    get_date_range_timestamps,
+)
+from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, RECAP_SCAN_INTERVAL, DEFAULT_DATE_RANGE
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class BirdfyHighlightsCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching Birdfy data."""
+    """Class to manage fetching Birdfy highlights data."""
 
     def __init__(
         self,
@@ -105,3 +111,53 @@ class BirdfyHighlightsCoordinator(DataUpdateCoordinator):
 
         except BirdfyHighlightsApiError as err:
             raise UpdateFailed(f"Error fetching data: {err}")
+
+
+class BirdfyRecapCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching Birdfy monthly recap data."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        api: BirdfyRecapApi,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the coordinator."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN}_recap",
+            update_interval=timedelta(minutes=RECAP_SCAN_INTERVAL),
+        )
+        self.api = api
+        self.entry = entry
+
+    async def _async_update_data(self) -> dict:
+        """Fetch recap data from API."""
+        try:
+            data = await self.api.async_get_recap()
+
+            # Process and return the recap data
+            return {
+                "statistics_date": data.get("statisticsDate"),
+                "duration": data.get("duration"),
+                "event_count": data.get("eventCount", 0),
+                "bird_species_count": data.get("birdSpeciesCount", 0),
+                "bird_visits": data.get("birdSpeciesComeCount", 0),
+                "species_surpasses_percent": data.get("birdSpeciesCountSurpasses"),
+                "visits_surpasses_percent": data.get("birdSpeciesComeCountSurpasses"),
+                "top_bird": data.get("maxComeBirdName"),
+                "uncommon_bird": data.get("unCommonBirdName"),
+                "uncommon_surpasses_percent": data.get("unCommonBirdSurpass"),
+                "hummingbird_species_count": data.get("hummingBirdSpeciesCount", 0),
+                "hummingbird_visits": data.get("hummingBirdSpeciesComeCount", 0),
+                "video_highlights": data.get("collectionMergeFile"),
+                "video_top_bird": data.get("maxComeBirdFile"),
+                "video_uncommon": data.get("unCommonBirdFile"),
+                "video_busiest": data.get("mostBirdNumberFile"),
+                "video_hummingbird": data.get("hummingBirdMergeFile"),
+                "raw": data,
+            }
+
+        except BirdfyRecapApiError as err:
+            raise UpdateFailed(f"Error fetching recap data: {err}")
