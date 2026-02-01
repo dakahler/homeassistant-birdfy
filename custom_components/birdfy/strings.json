@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Birdfy",
-        "description": "Enter your Birdfy UUIDs. You can find these from share links:\n- Highlight UUID: https://highlight.birdfy.com/?uuid=YOUR_UUID\n- Recap UUID (optional): https://recap.birdfy.com/?uuid=YOUR_UUID",
+        "description": "Enter your Birdfy UUIDs. You can find these from share links in the Birdfy app:\n- Highlight: {highlight_url}\n- Recap: {recap_url}",
         "data": {
           "uuid": "Highlight UUID",
           "recap_uuid": "Recap UUID (optional)"

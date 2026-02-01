@@ -91,6 +91,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
+            description_placeholders={
+                "highlight_url": "https://highlight.birdfy.com/?uuid=YOUR_UUID",
+                "recap_url": "https://recap.birdfy.com/?uuid=YOUR_UUID",
+            },
         )
 
     @staticmethod
