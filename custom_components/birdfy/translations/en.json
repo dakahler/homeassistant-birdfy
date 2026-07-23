@@ -29,15 +29,19 @@
         "title": "Birdfy Options",
         "description": "Update your Birdfy configuration.",
         "data": {
+          "uuid": "Highlight UUID",
           "recap_uuid": "Recap UUID"
         },
         "data_description": {
+          "uuid": "Required. The UUID from your Birdfy highlights share link.",
           "recap_uuid": "The UUID from your Birdfy monthly recap share link. Leave empty to disable recap sensors."
         }
       }
     },
     "error": {
-      "invalid_recap_uuid": "Invalid Recap UUID. Please check the UUID and try again."
+      "invalid_uuid": "Invalid Highlight UUID. Please check the UUID and try again.",
+      "invalid_recap_uuid": "Invalid Recap UUID. Please check the UUID and try again.",
+      "already_configured": "This Highlight UUID is already configured in another entry."
     }
   },
   "config_subentries": {

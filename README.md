@@ -36,13 +36,33 @@ A Home Assistant integration that exposes bird species data from your Birdfy fee
 
 ### Finding Your UUID
 
-Your UUID can be found from the Birdfy mobile app's share feature. Look for a link like:
+Both UUIDs are obtained from share links in the Birdfy mobile app. The UUID is always the value after `uuid=` in the URL that opens.
 
-```
-https://highlight.birdfy.com/?uuid=YOUR_UUID_HERE
-```
+#### Highlight UUID (required)
 
-The UUID is the value after `uuid=`.
+1. Open the Birdfy app
+2. Tap your profile image in the top right corner
+3. Select **Highlights**
+4. A browser tab opens — copy its URL
+5. The UUID is the value after `uuid=`:
+
+   ```
+   https://highlight.birdfy.com/?uuid=YOUR_UUID_HERE
+   ```
+
+#### Recap UUID (optional)
+
+The steps are identical to the Highlight UUID, except you select **Recap** in the app instead of Highlights:
+
+1. Open the Birdfy app
+2. Tap your profile image in the top right corner
+3. Select **Recap**
+4. A browser tab opens — copy its URL
+5. The UUID is the value after `uuid=`:
+
+   ```
+   https://recap.birdfy.com/?uuid=YOUR_UUID_HERE
+   ```
 
 ## Sensors
 
