@@ -126,32 +126,56 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             session = async_get_clientsession(self.hass)
 
+            # Validate highlights UUID (required)
+            uuid = user_input.get(CONF_UUID, "").strip()
+            if not uuid:
+                errors["base"] = "invalid_uuid"
+            else:
+                api = BirdfyHighlightsApi(uuid, session)
+                if not await api.async_validate_uuid():
+                    errors["base"] = "invalid_uuid"
+
             # Validate recap UUID if provided
             recap_uuid = user_input.get(CONF_RECAP_UUID, "").strip()
-            if recap_uuid:
+            if not errors and recap_uuid:
                 recap_api = BirdfyRecapApi(recap_uuid, session)
                 if not await recap_api.async_validate_uuid():
                     errors["base"] = "invalid_recap_uuid"
 
+            # Ensure the new highlights UUID isn't already used by another entry
+            if not errors and uuid != self.config_entry.data.get(CONF_UUID):
+                for entry in self.hass.config_entries.async_entries(DOMAIN):
+                    if (
+                        entry.entry_id != self.config_entry.entry_id
+                        and entry.data.get(CONF_UUID) == uuid
+                    ):
+                        errors["base"] = "already_configured"
+                        break
+
             if not errors:
                 # Update the config entry data
                 new_data = dict(self.config_entry.data)
+                new_data[CONF_UUID] = uuid
                 if recap_uuid:
                     new_data[CONF_RECAP_UUID] = recap_uuid
                 else:
                     new_data.pop(CONF_RECAP_UUID, None)
 
                 self.hass.config_entries.async_update_entry(
-                    self.config_entry, data=new_data
+                    self.config_entry,
+                    data=new_data,
+                    unique_id=uuid,
                 )
                 return self.async_create_entry(title="", data={})
 
+        current_uuid = self.config_entry.data.get(CONF_UUID, "")
         current_recap_uuid = self.config_entry.data.get(CONF_RECAP_UUID, "")
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
+                    vol.Required(CONF_UUID, default=current_uuid): str,
                     vol.Optional(CONF_RECAP_UUID, default=current_recap_uuid): str,
                 }
             ),
