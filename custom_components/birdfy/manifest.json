@@ -1,6 +1,7 @@
 {
   "domain": "birdfy",
   "name": "Birdfy",
+  "after_dependencies": ["frontend", "http", "lovelace"],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],

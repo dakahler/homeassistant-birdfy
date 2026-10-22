@@ -3,41 +3,57 @@
     "step": {
       "user": {
         "title": "Birdfy",
-        "description": "Enter your Birdfy UUIDs. You can find these from share links in the Birdfy app:\n- Highlight: {highlight_url}\n- Recap: {recap_url}",
+        "description": "Enter your Birdfy account credentials (for the full Moments feed) and/or your share link UUIDs:\n- Highlight: {highlight_url}\n- Recap: {recap_url}",
         "data": {
-          "uuid": "Highlight UUID",
+          "username": "Email / Username (Moments feed)",
+          "password": "Password (Moments feed)",
+          "uuid": "Highlight UUID (optional)",
           "recap_uuid": "Recap UUID (optional)"
         },
         "data_description": {
-          "uuid": "Required. The UUID from your Birdfy highlights share link.",
-          "recap_uuid": "Optional. The UUID from your Birdfy monthly recap share link. This may be different from your highlights UUID."
+          "username": "Your Birdfy / Netvue account email or username to enable the full Moments feed.",
+          "password": "Your Birdfy / Netvue account password.",
+          "uuid": "The UUID from your Birdfy highlights share link.",
+          "recap_uuid": "The UUID from your Birdfy monthly recap share link."
         }
       }
     },
     "error": {
+      "missing_configuration": "Please enter either your Birdfy account credentials or at least one share UUID.",
+      "invalid_auth": "Invalid Birdfy email/username or password.",
       "invalid_uuid": "Invalid Highlight UUID. Please check the UUID and try again.",
       "invalid_recap_uuid": "Invalid Recap UUID. Please check the UUID and try again.",
       "unknown": "Unexpected error occurred."
     },
     "abort": {
-      "already_configured": "This UUID is already configured."
+      "already_configured": "This Birdfy configuration is already set up."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Birdfy Options",
-        "description": "Update your Birdfy configuration.",
+        "description": "Update your Birdfy account credentials (for Moments) or share link UUIDs.",
         "data": {
+          "username": "Email / Username (Moments feed)",
+          "password": "Password (Moments feed)",
+          "uuid": "Highlight UUID",
           "recap_uuid": "Recap UUID"
         },
         "data_description": {
-          "recap_uuid": "The UUID from your Birdfy monthly recap share link. Leave empty to disable recap sensors."
+          "username": "Your Birdfy / Netvue account email or username. Leave empty to disable the Moments feed.",
+          "password": "Your Birdfy / Netvue account password.",
+          "uuid": "The UUID from your Birdfy highlights share link. Leave empty to disable Highlights sensors.",
+          "recap_uuid": "The UUID from your Birdfy monthly recap share link. Leave empty to disable Recap sensors."
         }
       }
     },
     "error": {
-      "invalid_recap_uuid": "Invalid Recap UUID. Please check the UUID and try again."
+      "missing_configuration": "Please keep at least one configuration source (Account Login, Highlight UUID, or Recap UUID).",
+      "invalid_auth": "Invalid Birdfy email/username or password.",
+      "invalid_uuid": "Invalid Highlight UUID. Please check the UUID and try again.",
+      "invalid_recap_uuid": "Invalid Recap UUID. Please check the UUID and try again.",
+      "unknown": "Unexpected error occurred."
     }
   },
   "config_subentries": {

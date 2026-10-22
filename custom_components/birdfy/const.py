@@ -7,15 +7,35 @@ CONF_RECAP_UUID = "recap_uuid"
 CONF_DATE_RANGE = "date_range"
 CONF_SUBENTRY_NAME = "name"
 
+# Account / Moments configuration
+CONF_USERNAME = "username"
+CONF_PASSWORD = "password"
+CONF_TOKEN = "token"
+CONF_REFRESH_TOKEN = "refresh_token"
+CONF_USER_ID = "user_id"
+CONF_REGION = "region"
+CONF_UDID = "udid"
+
 # Subentry types
 SUBENTRY_TYPE_DATE_RANGE = "date_range"
 
 API_URL = "https://api2.nvts.co/moments/h5CuratedData"
 RECAP_API_URL = "https://api2.nvts.co/moments/community/recapData"
 
+# Authenticated Moments & Account API URLs
+AUTH_BASE_URL = "https://localweb.netvue.co/v1/"
+MOMENTS_BASE_URL_TEMPLATE = "https://{region}-api2.netvue.co/"
+MOMENTS_DEFAULT_BASE_URL = "https://api2.netvue.co/"
+CENTRAL_API_BASE_URL = "https://centralapi.nvts.co/"
+DEFAULT_UCID = "513774810c"
+
 # Update interval in minutes
 DEFAULT_SCAN_INTERVAL = 15
 RECAP_SCAN_INTERVAL = 60  # Recap data changes less frequently
+MOMENTS_SCAN_INTERVAL = 5  # Moments feed updates frequently
+
+# Home Assistant bus event fired when a new moment arrives
+EVENT_NEW_MOMENT = f"{DOMAIN}_new_moment"
 
 # Date range options
 DATE_RANGE_TODAY = "today"
@@ -50,6 +70,16 @@ ATTR_THUMBNAILS = "thumbnails"
 ATTR_DATE_RANGE = "date_range"
 ATTR_START_TIME = "start_time"
 ATTR_END_TIME = "end_time"
+
+# Attributes - Moments
+ATTR_TOTAL_MOMENTS = "total_moments"
+ATTR_BIRD_VISITS = "bird_visits"
+ATTR_ANIMAL_VISITS = "animal_visits"
+ATTR_COLLECTED_COUNT = "collected_count"
+ATTR_SPECIES_COUNTS = "species_counts"
+ATTR_MOMENTS = "moments"
+ATTR_ALARM_ID = "alarm_id"
+ATTR_AI_LABELS = "ai_labels"
 
 # Attributes - Recap
 ATTR_RECAP_DATE = "statistics_date"

@@ -8,20 +8,37 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.config_entries import ConfigEntry, ConfigSubentryFlow, SubentryFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigSubentryFlow,
+    SubentryFlowResult,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import BirdfyHighlightsApi, BirdfyRecapApi
+from .api import (
+    BirdfyAccountApi,
+    BirdfyAuthError,
+    BirdfyHighlightsApi,
+    BirdfyMomentsApiError,
+    BirdfyRecapApi,
+)
 from .const import (
-    DOMAIN,
-    CONF_UUID,
-    CONF_RECAP_UUID,
     CONF_DATE_RANGE,
+    CONF_PASSWORD,
+    CONF_RECAP_UUID,
+    CONF_REFRESH_TOKEN,
+    CONF_REGION,
     CONF_SUBENTRY_NAME,
-    DEFAULT_DATE_RANGE,
+    CONF_TOKEN,
+    CONF_UDID,
+    CONF_USER_ID,
+    CONF_USERNAME,
+    CONF_UUID,
     DATE_RANGE_OPTIONS,
+    DEFAULT_DATE_RANGE,
+    DOMAIN,
     SUBENTRY_TYPE_DATE_RANGE,
 )
 
@@ -29,7 +46,9 @@ _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_UUID): str,
+        vol.Optional(CONF_USERNAME, default=""): str,
+        vol.Optional(CONF_PASSWORD, default=""): str,
+        vol.Optional(CONF_UUID, default=""): str,
         vol.Optional(CONF_RECAP_UUID, default=""): str,
     }
 )
@@ -39,20 +58,65 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     """Validate the user input allows us to connect."""
     session = async_get_clientsession(hass)
 
-    # Validate highlights UUID (required)
-    api = BirdfyHighlightsApi(data[CONF_UUID], session)
-    if not await api.async_validate_uuid():
-        raise InvalidUUID
-
-    # Validate recap UUID if provided (optional)
+    username = data.get(CONF_USERNAME, "").strip()
+    password = data.get(CONF_PASSWORD, "")
+    uuid = data.get(CONF_UUID, "").strip()
     recap_uuid = data.get(CONF_RECAP_UUID, "").strip()
+
+    if not username and not password and not uuid and not recap_uuid:
+        raise MissingConfiguration
+
+    if bool(username) != bool(password):
+        raise InvalidAuth
+
+    entry_data: dict[str, Any] = {}
+
+    # Validate Birdfy account login if provided
+    if username and password:
+        account_api = BirdfyAccountApi(
+            session,
+            username=username,
+            password=password,
+            udid=data.get(CONF_UDID),
+        )
+        try:
+            await account_api.async_login(username, password)
+        except (BirdfyAuthError, BirdfyMomentsApiError) as err:
+            raise InvalidAuth from err
+
+        entry_data[CONF_USERNAME] = username
+        entry_data[CONF_PASSWORD] = password
+        entry_data[CONF_TOKEN] = account_api.token
+        entry_data[CONF_REFRESH_TOKEN] = account_api.refresh_token
+        entry_data[CONF_USER_ID] = account_api.user_id
+        entry_data[CONF_REGION] = account_api.region
+        entry_data[CONF_UDID] = account_api.udid
+
+    # Validate highlights UUID if provided
+    if uuid:
+        api = BirdfyHighlightsApi(uuid, session)
+        if not await api.async_validate_uuid():
+            raise InvalidUUID
+        entry_data[CONF_UUID] = uuid
+
+    # Validate recap UUID if provided
     if recap_uuid:
         recap_api = BirdfyRecapApi(recap_uuid, session)
         if not await recap_api.async_validate_uuid():
             raise InvalidRecapUUID
+        entry_data[CONF_RECAP_UUID] = recap_uuid
 
-    # Return info to store in the config entry
-    return {"title": f"Birdfy ({data[CONF_UUID][:8]}...)"}
+    if username:
+        title = f"Birdfy ({username})"
+        unique_id = str(entry_data.get(CONF_USER_ID) or username)
+    elif uuid:
+        title = f"Birdfy ({uuid[:8]}...)"
+        unique_id = uuid
+    else:
+        title = f"Birdfy Recap ({recap_uuid[:8]}...)"
+        unique_id = f"recap_{recap_uuid}"
+
+    return {"title": title, "unique_id": unique_id, "data": entry_data}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -69,6 +133,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
+            except MissingConfiguration:
+                errors["base"] = "missing_configuration"
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
             except InvalidUUID:
                 errors["base"] = "invalid_uuid"
             except InvalidRecapUUID:
@@ -77,15 +145,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
-                # Check if already configured
-                await self.async_set_unique_id(user_input[CONF_UUID])
+                await self.async_set_unique_id(info["unique_id"])
                 self._abort_if_unique_id_configured()
 
-                # Clean up empty recap UUID
-                if not user_input.get(CONF_RECAP_UUID, "").strip():
-                    user_input.pop(CONF_RECAP_UUID, None)
-
-                return self.async_create_entry(title=info["title"], data=user_input)
+                return self.async_create_entry(
+                    title=info["title"], data=info["data"]
+                )
 
         return self.async_show_form(
             step_id="user",
@@ -115,7 +180,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle options flow to update UUIDs."""
+    """Handle options flow to update Birdfy account credentials and UUIDs."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -124,34 +189,39 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            session = async_get_clientsession(self.hass)
-
-            # Validate recap UUID if provided
-            recap_uuid = user_input.get(CONF_RECAP_UUID, "").strip()
-            if recap_uuid:
-                recap_api = BirdfyRecapApi(recap_uuid, session)
-                if not await recap_api.async_validate_uuid():
-                    errors["base"] = "invalid_recap_uuid"
-
-            if not errors:
-                # Update the config entry data
-                new_data = dict(self.config_entry.data)
-                if recap_uuid:
-                    new_data[CONF_RECAP_UUID] = recap_uuid
-                else:
-                    new_data.pop(CONF_RECAP_UUID, None)
-
+            merged = dict(self.config_entry.data)
+            merged.update(user_input)
+            try:
+                info = await validate_input(self.hass, merged)
+            except MissingConfiguration:
+                errors["base"] = "missing_configuration"
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except InvalidUUID:
+                errors["base"] = "invalid_uuid"
+            except InvalidRecapUUID:
+                errors["base"] = "invalid_recap_uuid"
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Unexpected exception in options flow")
+                errors["base"] = "unknown"
+            else:
                 self.hass.config_entries.async_update_entry(
-                    self.config_entry, data=new_data
+                    self.config_entry, data=info["data"]
                 )
                 return self.async_create_entry(title="", data={})
 
+        current_username = self.config_entry.data.get(CONF_USERNAME, "")
+        current_password = self.config_entry.data.get(CONF_PASSWORD, "")
+        current_uuid = self.config_entry.data.get(CONF_UUID, "")
         current_recap_uuid = self.config_entry.data.get(CONF_RECAP_UUID, "")
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
+                    vol.Optional(CONF_USERNAME, default=current_username): str,
+                    vol.Optional(CONF_PASSWORD, default=current_password): str,
+                    vol.Optional(CONF_UUID, default=current_uuid): str,
                     vol.Optional(CONF_RECAP_UUID, default=current_recap_uuid): str,
                 }
             ),
@@ -233,6 +303,14 @@ class DateRangeSubentryFlowHandler(ConfigSubentryFlow):
                 }
             ),
         )
+
+
+class MissingConfiguration(Exception):
+    """Error to indicate neither account credentials nor UUIDs were provided."""
+
+
+class InvalidAuth(Exception):
+    """Error to indicate Birdfy account credentials are invalid."""
 
 
 class InvalidUUID(Exception):
